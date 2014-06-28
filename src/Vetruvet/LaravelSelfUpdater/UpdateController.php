@@ -48,10 +48,15 @@ class UpdateController extends Controller {
                 Artisan::call('dump-autoload');
                 Artisan::call('optimize');
 
-                $migrate_tmp = fopen('php://memory', 'w+');
-                Artisan::call('migrate', array('--force' => true), new StreamOutput($migrate_tmp));
-                rewind($migrate_tmp);
-                $migrate_out = stream_get_contents($migrate_tmp);
+                try {
+                    $migrate_tmp = fopen('php://memory', 'w+');
+                    Artisan::call('migrate', array('--force' => true), new StreamOutput($migrate_tmp));
+                    rewind($migrate_tmp);
+                    $migrate_out = stream_get_contents($migrate_tmp);
+                } catch (Exception $e) {
+                    $migrate_out = $e->getMessage();
+                }
+                fclose($migrate_tmp);
 
                 $success = true;
             } else {
