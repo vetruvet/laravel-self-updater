@@ -1,0 +1,20 @@
+{
+    "name": "vetruvet/laravel-self-updater",
+    "description": "Git webhook self-updater for Laravel",
+    "authors": [
+        {
+            "name": "Valera Trubachev",
+            "email": "vetruvet@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "laravel/framework": "4.*"
+    },
+    "autoload": {
+        "psr-0": {
+            "Vetruvet\\LaravelSelfUpdater\\": "src/"
+        }
+    },
+    "minimum-stability": "stable"
+}
