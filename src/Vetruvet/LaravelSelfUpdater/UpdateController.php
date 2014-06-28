@@ -53,17 +53,18 @@ class UpdateController extends Controller {
                     Artisan::call('migrate', array('--force' => true), new StreamOutput($migrate_tmp));
                     rewind($migrate_tmp);
                     $migrate_out = stream_get_contents($migrate_tmp);
-                } catch (Exception $e) {
-                    $migrate_out = $e->getMessage();
+
+                    $success = true;
+                } catch (\Exception $e) {
+                    $error = Lang::get('self-updater::messages.error_migration');
+                    $error_out = $e->getMessage();
                 }
                 fclose($migrate_tmp);
-
-                $success = true;
             } else {
-                $error = Lang::get('self-updater::messages.pull_failed', array('pull_exit_code' => $pull_return));
+                $error = Lang::get('self-updater::messages.error_pull_failed', array('pull_exit_code' => $pull_return));
             }
         } else {
-            $error     = Lang::get('self-updater::messages.dirty_tree');
+            $error     = Lang::get('self-updater::messages.error_dirty_tree');
             $error_out = join("\n", $status_out);
         }
 
