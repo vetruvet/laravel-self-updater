@@ -1,6 +1,8 @@
 {
     "name": "vetruvet/laravel-self-updater",
     "description": "Git webhook self-updater for Laravel",
+    "keywords": [ "laravel", "git", "self-updater", "updater" ],
+    "license": "Apache-2.0",
     "authors": [
         {
             "name": "Valera Trubachev",
@@ -8,7 +10,7 @@
         }
     ],
     "require": {
-        "php": ">=5.4.0",
+        "php": ">=5.3.0",
         "laravel/framework": "4.*"
     },
     "autoload": {
