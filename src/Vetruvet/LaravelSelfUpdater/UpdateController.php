@@ -72,54 +72,64 @@ class UpdateController extends Controller {
         if (empty($site_name)) $site_name = Input::server('SERVER_NAME');
 
         $email_data = array(
-            'site_name'    => $site_name,
-            'auto'         => $auto,
-            'success'      => $success,
-            'git_pull_out' => $git_pull_out,
-            'git_log_out'  => $git_log_out,
-            'migrate_out'  => $migrate_out,
-            'error'        => $error,
-            'error_out'    => $error_out,
+            'site_name'       => $site_name,
+            'auto'            => $auto,
+            'success'         => $success,
+            'git_commit_hash' => $git_commit_hash,
+            'git_pull_out'    => $git_pull_out,
+            'git_log_out'     => $git_log_out,
+            'migrate_out'     => $migrate_out,
+            'error'           => $error,
+            'error_out'       => $error_out,
         );
 
-        if (Config::get('self-updater::email')) {
-            Mail::send('self-updater::update_email', $email_data, function ($message) use ($site_name, $success, $git_commit_hash) {
-                $from = Config::get('self-updater::email.from.address', Config::get('mail.from.address'));
-                $from_name = Config::get('self-updater::email.from.name', Config::get('mail.from.name'));
-
-                $subject = Config::get('self-updater::email.subject', null);
-
-                $to = Config::get('self-updater::email.to', $from);
-                $reply_to = Config::get('self-updater::email.reply_to', $from);
-                
-                if (is_array($subject)) {
-                    if (isset($subject[$success ? 'success' : 'error'])) {
-                        $subject = $subject[$success ? 'success' : 'error'];
-                    } else {
-                        $subject = null;
-                    }
-                }
-
-                if (is_callable($subject)) {
-                    $subject = $subject($site_name, $success, $git_commit_hash);
-                } 
-
-                if (empty($subject)) {
-                    if ($success) {
-                        $subject = Lang::get('self-updater::messages.subject_success', array('site_name' => $site_name, 'commit_hash' => $git_commit_hash));
-                    } else {
-                        $subject = Lang::get('self-updater::messages.subject_error', array('site_name' => $site_name));
-                    }
-                }
-
-                $message->from($from, $from_name)->replyTo($reply_to)->to($to)->subject($subject);
-            });
-        }
+        $this->sendUpdateEmail($email_data);
 
         if (!$auto) {
             return View::make('self-updater::update_email', $email_data);
         }
 
         return '';
+    }
+
+    protected function sendUpdateEmail($email_data) {
+        if (!Config::get('self-updater::email')) return;
+
+        $from = Config::get('self-updater::email.from.address', Config::get('mail.from.address'));
+        $from_name = Config::get('self-updater::email.from.name', Config::get('mail.from.name'));
+
+        $subject = Config::get('self-updater::email.subject', null);
+        $to = Config::get('self-updater::email.to', $from);
+
+        if (empty($to)) return;
+
+        if (empty($from)) $from = 'self-updater@' . Input::server('SERVER_NAME');
+        if (empty($from_name)) $from_name = Lang::get('self-updater::messages.from_name', array('site_name' => $email_data['site_name']));
+
+        $reply_to = Config::get('self-updater::email.reply_to', $from);
+        
+        if (is_array($subject)) {
+            if (isset($subject[$email_data['success'] ? 'success' : 'error'])) {
+                $subject = $subject[$email_data['success'] ? 'success' : 'error'];
+            } else {
+                $subject = null;
+            }
+        }
+
+        if (is_callable($subject)) {
+            $subject = $subject($email_data['site_name'], $email_data['success'], $email_data['git_commit_hash']);
+        } 
+
+        if (empty($subject)) {
+            if ($email_data['success']) {
+                $subject = Lang::get('self-updater::messages.subject_success', array('site_name' => $email_data['site_name'], 'commit_hash' => $email_data['git_commit_hash']));
+            } else {
+                $subject = Lang::get('self-updater::messages.subject_error', array('site_name' => $email_data['site_name']));
+            }
+        }
+
+        Mail::send('self-updater::update_email', $email_data, function ($message) use ($from, $from_name, $reply_to, $to, $subject) {
+            $message->from($from, $from_name)->replyTo($reply_to)->to($to)->subject($subject);
+        });
     }
 }

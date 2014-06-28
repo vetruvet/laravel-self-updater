@@ -5,6 +5,8 @@ return array(
     'error_dirty_tree'      => 'The tree is not clean - modifications have been made directly to files without using git.',
     'error_migration'       => 'An error occurred while running database migration(s).',
 
+    'from_name' => ':site_name Self-Updater',
+
     'subject_success' => ':site_name Self-Updater Success: :commit_hash',
     'subject_error'   => ':site_name Self-Updater ERROR',
 
