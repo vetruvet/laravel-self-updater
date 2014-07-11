@@ -23,6 +23,7 @@ use Input;
 use Lang;
 use Mail;
 use View;
+use Illuminate\Foundation\Application;
 use Illuminate\Routing\Controller;
 use Symfony\Component\Console\Output\StreamOutput;
 
@@ -64,8 +65,13 @@ class UpdateController extends Controller {
                 Artisan::call('optimize');
 
                 try {
+                    $migrate_opts = array();
+                    if (version_compare(Application::VERSION, '4.2', '>=')) {
+                        $migrate_opts['--force'] = true;
+                    }
+
                     $migrate_tmp = fopen('php://memory', 'w+');
-                    Artisan::call('migrate', array('--force' => true), new StreamOutput($migrate_tmp));
+                    Artisan::call('migrate', $migrate_opts, new StreamOutput($migrate_tmp));
                     rewind($migrate_tmp);
                     $migrate_out = stream_get_contents($migrate_tmp);
 
