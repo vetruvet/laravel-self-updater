@@ -58,7 +58,7 @@ class UpdateController extends Controller {
                 exec('cd "' . $root . '"; git log --oneline ORIG_HEAD..;', $git_log_out);
                 $git_log_out  = join("\n", $git_log_out);
 
-                $git_commit_hash = substr(trim(`git rev-parse HEAD`), Config::get('self-updater::commit_hash_length', 0));
+                $git_commit_hash = substr(trim(`git rev-parse HEAD`), 0, Config::get('self-updater::commit_hash_length', 0));
 
                 Artisan::call('clear-compiled');
                 Artisan::call('dump-autoload');
