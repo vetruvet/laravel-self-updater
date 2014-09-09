@@ -19,6 +19,7 @@ namespace Vetruvet\LaravelSelfUpdater;
 
 use Artisan;
 use Config;
+use Event;
 use Input;
 use Lang;
 use Mail;
@@ -48,45 +49,57 @@ class UpdateController extends Controller {
 
         $error = $error_out = '';
 
-        exec('cd "' . $root . '"; git status --porcelain | grep .;', $status_out, $status_return);
-
-        if ($status_return != 0) {
-            exec('cd "' . $root . '"; git pull origin ' . Config::get('self-updater::branch', 'master') . ' 2>&1;', $git_pull_out, $pull_return);
-            $git_pull_out = join("\n", $git_pull_out);
-
-            if ($pull_return == 0) {
-                exec('cd "' . $root . '"; git log --oneline ORIG_HEAD..;', $git_log_out);
-                $git_log_out  = join("\n", $git_log_out);
-
-                $git_commit_hash = substr(trim(`git rev-parse HEAD`), 0, Config::get('self-updater::commit_hash_length', 0));
-
-                Artisan::call('clear-compiled');
-                Artisan::call('dump-autoload');
-                Artisan::call('optimize');
-
-                try {
-                    $migrate_opts = array();
-                    if (version_compare(Application::VERSION, '4.2', '>=')) {
-                        $migrate_opts['--force'] = true;
-                    }
-
-                    $migrate_tmp = fopen('php://memory', 'w+');
-                    Artisan::call('migrate', $migrate_opts, new StreamOutput($migrate_tmp));
-                    rewind($migrate_tmp);
-                    $migrate_out = stream_get_contents($migrate_tmp);
-
-                    $success = true;
-                } catch (\Exception $e) {
-                    $error = Lang::get('self-updater::messages.error_migration');
-                    $error_out = $e->getMessage();
-                }
-                fclose($migrate_tmp);
-            } else {
-                $error = Lang::get('self-updater::messages.error_pull_failed', array('pull_exit_code' => $pull_return));
+        $cancelled = false;
+        $responses = Event::fire('self-updater.pre-update', array($auto));
+        foreach ($responses as $resp) {
+            if ($resp === false) {
+                $error = Lang::get('self-updater::messages.error_cancelled');
+                $cancelled = true;
+                break;
             }
-        } else {
-            $error     = Lang::get('self-updater::messages.error_dirty_tree');
-            $error_out = join("\n", $status_out);
+        }
+
+        if (!$cancelled) {
+            exec('cd "' . $root . '"; git status --porcelain | grep .;', $status_out, $status_return);
+
+            if ($status_return != 0) {
+                exec('cd "' . $root . '"; git pull origin ' . Config::get('self-updater::branch', 'master') . ' 2>&1;', $git_pull_out, $pull_return);
+                $git_pull_out = join("\n", $git_pull_out);
+
+                if ($pull_return == 0) {
+                    exec('cd "' . $root . '"; git log --oneline ORIG_HEAD..;', $git_log_out);
+                    $git_log_out  = join("\n", $git_log_out);
+
+                    $git_commit_hash = substr(trim(`git rev-parse HEAD`), 0, Config::get('self-updater::commit_hash_length', 0));
+
+                    Artisan::call('clear-compiled');
+                    Artisan::call('dump-autoload');
+                    Artisan::call('optimize');
+
+                    try {
+                        $migrate_opts = array();
+                        if (version_compare(Application::VERSION, '4.2', '>=')) {
+                            $migrate_opts['--force'] = true;
+                        }
+
+                        $migrate_tmp = fopen('php://memory', 'w+');
+                        Artisan::call('migrate', $migrate_opts, new StreamOutput($migrate_tmp));
+                        rewind($migrate_tmp);
+                        $migrate_out = stream_get_contents($migrate_tmp);
+
+                        $success = true;
+                    } catch (\Exception $e) {
+                        $error = Lang::get('self-updater::messages.error_migration');
+                        $error_out = $e->getMessage();
+                    }
+                    fclose($migrate_tmp);
+                } else {
+                    $error = Lang::get('self-updater::messages.error_pull_failed', array('pull_exit_code' => $pull_return));
+                }
+            } else {
+                $error     = Lang::get('self-updater::messages.error_dirty_tree');
+                $error_out = join("\n", $status_out);
+            }
         }
 
         $site_name = Config::get('self-updater::site_name');
@@ -104,7 +117,9 @@ class UpdateController extends Controller {
             'error_out'       => $error_out,
         );
 
-        $this->sendUpdateEmail($email_data);
+        $sent_email = $this->sendUpdateEmail($email_data);
+
+        Event::fire('self-updater.post-update', array($success, $error, $auto, $git_commit_hash, $sent_email));
 
         if (!$auto) {
             return View::make('self-updater::update_email', $email_data);
@@ -114,7 +129,7 @@ class UpdateController extends Controller {
     }
 
     protected function sendUpdateEmail($email_data) {
-        if (!Config::get('self-updater::email')) return;
+        if (!Config::get('self-updater::email')) return false;
 
         $from = Config::get('self-updater::email.from.address', Config::get('mail.from.address'));
         $from_name = Config::get('self-updater::email.from.name', Config::get('mail.from.name'));
@@ -122,7 +137,7 @@ class UpdateController extends Controller {
         $subject = Config::get('self-updater::email.subject', null);
         $to = Config::get('self-updater::email.to', $from);
 
-        if (empty($to)) return;
+        if (empty($to)) return false;
 
         if (empty($from)) $from = 'self-updater@' . Input::server('SERVER_NAME');
         if (empty($from_name)) $from_name = Lang::get('self-updater::messages.from_name', array('site_name' => $email_data['site_name']));
@@ -152,5 +167,7 @@ class UpdateController extends Controller {
         Mail::send('self-updater::update_email', $email_data, function ($message) use ($from, $from_name, $reply_to, $to, $subject) {
             $message->from($from, $from_name)->replyTo($reply_to)->to($to)->subject($subject);
         });
+
+        return true;
     }
 }

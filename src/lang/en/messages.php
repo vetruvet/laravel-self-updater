@@ -16,6 +16,7 @@
  */
 
 return array(
+    'error_cancelled'       => 'The update was cancelled by a pre-update event hook.',
     'error_pull_failed'     => 'The pull failed (:pull_exit_code) - see git pull output for details.',
     'error_dirty_tree'      => 'The tree is not clean - modifications have been made directly to files without using git.',
     'error_migration'       => 'An error occurred while running database migration(s).',

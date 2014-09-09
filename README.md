@@ -7,13 +7,15 @@ What it does
 ------------
 The updater is triggered by a POST request executed by the git server when a push occurs. Once triggered it does:
  1. Checks that the push was to the branch it is configured for
- 2. Checks tree status to make sure it is clean before pulling
- 3. Execute `git pull`.
- 4. Get the current commit hash (for display purposes)
- 5. Get the list of commits pulled.
- 6. Rebuild optimized class file (`clear-compiled`, `dump-autoload`, `optimize`)
- 7. Run all migrations
- 8. Optionally notify of the update status by email
+ 2. Fire pre-update event listener
+ 3. Checks tree status to make sure it is clean before pulling
+ 4. Execute `git pull`.
+ 5. Get the current commit hash (for display purposes)
+ 6. Get the list of commits pulled.
+ 7. Rebuild optimized class file (`clear-compiled`, `dump-autoload`, `optimize`)
+ 8. Run all migrations
+ 9. Fire post-update event listener
+ 10. Optionally notify of the update status by email
 
 Requirements
 ------------
@@ -81,6 +83,25 @@ $ php artisan view:publish vetruvet/laravel-self-updater
 ```
 
 Now, set up the webhook in your git server to point to the route specified in the configuration (`/trigger_update` by default) and you're done!
+
+
+Event Listeners
+---------------
+```php
+Event::listen('self-updater.pre-update', function ($auto) {
+    // $auto: boolean whether update was triggered automatically through webhook (POST) or manually (GET)
+    // 
+    // return false; // return false to cancel the update operation.
+});
+
+Event::listen('self-updater.post-update', function($success, $error, $auto, $git_commit_hash, $sent_email) {
+    // $success: boolean success or failure
+    // $error: error string if failure, empty string otherwise
+    // $auto: boolean whether update was triggered automatically through webhook (POST) or manually (GET)
+    // $git_commit_hash: new git commit hash if update was successful, empty string otherwise
+    // $sent_email: boolean whether or not a notification email was sent
+});
+```
 
 Planned Features
 ----------------
